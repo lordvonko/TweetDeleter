@@ -1,14 +1,9 @@
 (async function() {
     'use strict';
 
-    // Major improvements and additions:
-    // - Fixed 403 Forbidden error by correcting header names: use 'x-csrf-token' instead of 'ct0'.
-    // - Added missing headers: 'content-type', 'x-twitter-active-user', 'x-twitter-auth-type' for authenticated GraphQL requests.
-    // - Confirmed queryId 'VaenaVgh5q5ih7kvyVjgtg' is still valid based on recent sources (as of 2025).
-    // - Enhanced error logging in deleteTweet to capture response details for better debugging.
 
     const DellTweet = {
-        // Optimized settings
+        // Optimized configurations
         config: {
             deleteDelay: 100,        // Base delay between deletions
             concurrency: 2,          // Initial concurrency, dynamically adjusted
@@ -17,7 +12,7 @@
             maxRetries: 3,
             rateLimitWait: 60,       // Base time for rate limit
             testMode: false,
-            maxFailed: 20,           // Failure limit before stopping
+            maxFailed: 20,           // Limit of failures before stopping
             pauseEvery: 100,         // Pause every N tweets
             pauseDuration: 2000      // Pause duration
         },
@@ -46,7 +41,7 @@
         // Protected tweet IDs
         protectedIds: [
             '',    //
-            ''     //
+            ''     // 
         ],
 
         // Headers
@@ -54,7 +49,7 @@
 
         // Initialization
         async init() {
-            console.log('🚀 DellTweet v2.6 - Fixed 403 error with updated headers');
+            console.log('🚀 DellTweet v2.7 - Fixed 403 error with updated headers');
             console.log(`🛡️ Protected tweets: ${this.protectedIds.length}`);
 
             if (window.DellTweet_Instance) {
@@ -68,14 +63,14 @@
 
             const ct0 = this.getCookie('ct0');
             if (!ct0) {
-                alert('Error: CSRF Token not found. Reload the page and log in again.');
+                alert('Error: CSRF token not found. Reload the page and log in again.');
                 return;
             }
 
             this.headers = {
-                'x-csrf-token': ct0,  // Corrected: use 'x-csrf-token' instead of 'ct0'
+                'x-csrf-token': ct0,  // Fixed: use 'x-csrf-token' instead of 'ct0'
                 'authorization': this.extractAuthToken() || 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA',
-                'content-type': 'application/json',  // Added: necessary header
+                'content-type': 'application/json',  // Added: required header
                 'x-twitter-active-user': 'yes',      // Added: header for active user
                 'x-twitter-auth-type': 'OAuth2Session'  // Added: auth type
             };
@@ -83,7 +78,7 @@
             this.createUI();
             this.setupEventListeners();
 
-            // Load failedIds from localStorage to resume
+            // Load failedIds from localStorage for resume
             const storedFailed = localStorage.getItem('delltweet-failed');
             if (storedFailed) {
                 this.state.failedIds = JSON.parse(storedFailed);
@@ -95,12 +90,12 @@
             }
 
             window.DellTweet_Instance = this;
-            console.log('✅ UI ready! Upload the tweet.js file');
+            console.log('✅ Interface ready! Upload the tweet.js file');
         },
 
         // Get cookie
         getCookie(name) {
-            const match = document.cookie.match(new RegExp('(^|\s)' + name + '=([^;]+)'));
+            const match = document.cookie.match(new RegExp('(^|\\s)' + name + '=([^;]+)'));
             return match ? match[2] : null;
         },
 
@@ -114,7 +109,7 @@
             return null;
         },
 
-        // Create improved UI
+        // Create improved interface
         createUI() {
             const ui = document.createElement('div');
             ui.id = 'deltweet-ui';
@@ -271,14 +266,14 @@
                         margin-top: 10px;
                     }
                 </style>
-                <h2>🗑️ DellTweet <span class="version">v2.6</span></h2>
+                <h2>🗑️ DellTweet <span class="version">v2.7</span></h2>
                 <div class="form-group">
                     <label for="tk-file">📁 Select the tweet.js file:</label>
                     <input type="file" id="tk-file" accept=".js,.json">
                     <div class="file-info" id="tk-file-info"></div>
                 </div>
                 <div class="form-group">
-                    <label for="tk-date">📅 Delete tweets older than:</label>
+                    <label for="tk-date">📅 Delete tweets before:</label>
                     <input type="date" id="tk-date">
                 </div>
                 <div class="checkbox-group">
@@ -289,8 +284,7 @@
                 </div>
                 <div class="protected-tweets">
                     <h4>🛡️ Protected Tweets (${this.protectedIds.length})</h4>
-                    <div class="protected-list">${this.protectedIds.map((id, index) => `${index + 1}. ${id}`).join('<br>')}
-                    </div>
+                    <div class="protected-list">${this.protectedIds.map((id, index) => `${index + 1}. ${id}`).join('<br>')}</div>
                 </div>
                 <div class="warning">⚠️ Irreversible action! Make a backup.</div>
                 <div class="stats" id="tk-stats">
@@ -318,11 +312,11 @@
         // Populate cache with all elements
         populateCache() {
             const elements = ['stats', 'btn-start', 'btn-stop', 'btn-pause', 'btn-export', 'btn-close', 'status', 'file-info', 'progress-bar', 'progress-fill'];
-            elements.forEach(id => this.state.cache.set(id, document.getElementById(`tk-${id}`));
-            ['found', 'todelete', 'deleted', 'skipped', 'protected', 'failed', 'speed', 'elapsed'].forEach(stat => this.state.cache.set(`stat-${stat}`, document.getElementById(`stat-${stat}`));
+            elements.forEach(id => this.state.cache.set(id, document.getElementById(`tk-${id}`)));
+            ['found', 'todelete', 'deleted', 'skipped', 'protected', 'failed', 'speed', 'elapsed'].forEach(stat => this.state.cache.set(`stat-${stat}`, document.getElementById(`stat-${stat}`)));
         },
 
-        // Setup event listeners
+        // Setup events
         setupEventListeners() {
             const cache = this.state.cache;
             cache.get('btn-start').addEventListener('click', () => this.start());
@@ -339,7 +333,7 @@
 
             document.getElementById('tk-test-mode').addEventListener('change', (e) => {
                 this.config.testMode = e.target.checked;
-                this.updateStatus(this.config.testMode ? '🧪 Test mode enabled' : '💫 Test mode disabled');
+                this.updateStatus(this.config.testMode ? '🧪 Test mode activated' : '💫 Test mode deactivated');
             });
 
             document.getElementById('tk-debug-mode').addEventListener('change', (e) => {
@@ -419,8 +413,8 @@
                     });
                 }
             } catch (error) {
-                this.debug('Error reading file:', error);
-                this.updateStatus(`❌ Error reading file: ${error.message}`);
+                this.debug('Reading error:', error);
+                this.updateStatus(`❌ Reading error: ${error.message}`);
                 return;
             }
 
@@ -467,12 +461,12 @@
                 this.updateStatus(`✅ ${tweetsData.length} tweets loaded`);
                 if (fileInfo) fileInfo.innerHTML += `<br>✅ ${tweetsData.length} tweets`;
                 btnStart.disabled = false;
-                this.debug(`Processing complete: ${tweetsData.length} tweets.`);
+                this.debug(`Processing completed: ${tweetsData.length} tweets.`);
 
             } catch (error) {
                 this.debug('Processing error:', error);
                 this.updateStatus(`❌ ${error.message}`);
-                alert(error.message + '\n💡 Make sure it is the correct tweet.js file.');
+                alert(error.message + '\n💡 Check if it is the correct tweet.js.');
                 btnStart.disabled = true;
             }
         },
@@ -480,7 +474,7 @@
         // Start process (with upfront filter)
         async start() {
             if (this.state.tweetsToProcess.length === 0) {
-                alert('Load a valid tweet.js file or resume failed ones.');
+                alert('Load a valid tweet.js file or resume failures.');
                 return;
             }
 
@@ -559,7 +553,7 @@
                     await this.sleep(this.config.deleteDelay);
 
                     if (this.state.processedCount % this.config.pauseEvery === 0) {
-                        this.updateStatus(`⏸️ Pausing (${this.config.pauseDuration / 1000}s)...`);
+                        this.updateStatus(`⏸️ Pause (${this.config.pauseDuration / 1000}s)...`);
                         await this.sleep(this.config.pauseDuration);
                     }
                 }
@@ -568,7 +562,7 @@
             await Promise.all(workers.map(w => w()));
 
             // Dynamic concurrency adjustment
-            const successRate = this.state.stats.deleted / (this.state.stats.failed + this.state.stats.deleted || 1);
+            const successRate = this.state.stats.deleted / (this.state.stats.deleted + this.state.stats.failed || 1);
             this.state.lastSuccessRate = successRate;
             this.config.concurrency = Math.max(1, Math.min(5, Math.round(this.config.concurrency * successRate)));
 
@@ -609,7 +603,7 @@
                     if (success) break;
                     await this.sleep(1000 * Math.pow(2, attempt - 1)); // Exponential backoff
                 } catch (error) {
-                    this.debug(`Unexpected error on ${tweetId}:`, error);
+                    this.debug(`Unexpected error in ${tweetId}:`, error);
                 }
             }
 
@@ -656,7 +650,7 @@
                 return false;
 
             } catch (error) {
-                this.debug(`Network error on ${tweetId}:`, error);
+                this.debug(`Network error in ${tweetId}:`, error);
                 return false;
             }
         },
@@ -726,15 +720,15 @@
             const duration = Date.now() - stats.startTime;
             const minutes = Math.floor(duration / 60000);
             const seconds = Math.floor((duration % 60000) / 1000);
-            const summary = `✅ COMPLETE\n📊 ${stats.found} found\n🎯 ${stats.toDelete} to delete\n✅ ${stats.deleted} deleted\n⏭️ ${stats.skipped} skipped\n🛡️ ${stats.protected} protected\n❌ ${stats.failed} failed\n⏱️ ${minutes}m ${seconds}s\n⚡ ${Math.round(stats.deleted / (duration / 60000))} /min`;
-            this.updateStatus('✅ Complete!');
+            const summary = `✅ COMPLETED\n📊 ${stats.found} found\n🎯 ${stats.toDelete} to delete\n✅ ${stats.deleted} deleted\n⏭️ ${stats.skipped} skipped\n🛡️ ${stats.protected} protected\n❌ ${stats.failed} failed\n⏱️ ${minutes}m ${seconds}s\n⚡ ${Math.round(stats.deleted / (duration / 60000))} /min`;
+            this.updateStatus('✅ Completed!');
             alert(summary);
         },
 
         // Export report (with failedIds)
         async exportReport() {
             const report = {
-                version: '2.6',
+                version: '2.7',
                 exportDate: new Date().toISOString(),
                 stats: { ...this.state.stats },
                 duration: { ms: this.state.stats.startTime ? Date.now() - this.state.stats.startTime : 0 },
@@ -753,7 +747,7 @@
 
         // Close
         close() {
-            if (this.state.running && !confirm('Close while running?')) return;
+            if (this.state.running && !confirm('Close during execution?')) return;
             this.state.running = false;
             document.getElementById('deltweet-ui')?.remove();
             window.DellTweet_Instance = null;
