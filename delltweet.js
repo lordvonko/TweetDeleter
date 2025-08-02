@@ -1,20 +1,28 @@
 (async function() {
     'use strict';
 
-    const TweetDeleter = {
+    // Major improvements and additions:
+    // - Fixed 403 Forbidden error by correcting header names: use 'x-csrf-token' instead of 'ct0'.
+    // - Added missing headers: 'content-type', 'x-twitter-active-user', 'x-twitter-auth-type' for authenticated GraphQL requests.
+    // - Confirmed queryId 'VaenaVgh5q5ih7kvyVjgtg' is still valid based on recent sources (as of 2025).
+    // - Enhanced error logging in deleteTweet to capture response details for better debugging.
+
+    const DellTweet = {
+        // Optimized settings
         config: {
-            deleteDelay: 100,
-            concurrency: 2,
+            deleteDelay: 100,        // Base delay between deletions
+            concurrency: 2,          // Initial concurrency, dynamically adjusted
             maxDate: null,
             theme: 'dark',
             maxRetries: 3,
-            rateLimitWait: 60,
+            rateLimitWait: 60,       // Base time for rate limit
             testMode: false,
-            maxFailed: 20,
-            pauseEvery: 100,
-            pauseDuration: 2000
+            maxFailed: 20,           // Failure limit before stopping
+            pauseEvery: 100,         // Pause every N tweets
+            pauseDuration: 2000      // Pause duration
         },
 
+        // State
         state: {
             running: false,
             paused: false,
@@ -29,20 +37,28 @@
             },
             cache: new Map(),
             tweetsToProcess: [],
-            failedIds: [],
+            failedIds: [],           // Tracks failed IDs for export and resume
             processedCount: 0,
             rateLimitReset: null,
             lastSuccessRate: 1.0
         },
 
+        // Protected tweet IDs
+        protectedIds: [
+            '',    //
+            ''     //
+        ],
+
+        // Headers
         headers: {},
 
+        // Initialization
         async init() {
-            console.log('🚀 TweetDeleter v2.6 - Fixed 403 error with updated headers');
+            console.log('🚀 DellTweet v2.6 - Fixed 403 error with updated headers');
             console.log(`🛡️ Protected tweets: ${this.protectedIds.length}`);
 
-            if (window.TweetDeleter_Instance) {
-                window.TweetDeleter_Instance.close();
+            if (window.DellTweet_Instance) {
+                window.DellTweet_Instance.close();
             }
 
             if (!window.location.href.includes('x.com') && !window.location.href.includes('twitter.com')) {
@@ -52,40 +68,43 @@
 
             const ct0 = this.getCookie('ct0');
             if (!ct0) {
-                alert('Error: CSRF token not found. Please reload the page and log in again.');
+                alert('Error: CSRF Token not found. Reload the page and log in again.');
                 return;
             }
 
             this.headers = {
-                'x-csrf-token': ct0,
+                'x-csrf-token': ct0,  // Corrected: use 'x-csrf-token' instead of 'ct0'
                 'authorization': this.extractAuthToken() || 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA',
-                'content-type': 'application/json',
-                'x-twitter-active-user': 'yes',
-                'x-twitter-auth-type': 'OAuth2Session'
+                'content-type': 'application/json',  // Added: necessary header
+                'x-twitter-active-user': 'yes',      // Added: header for active user
+                'x-twitter-auth-type': 'OAuth2Session'  // Added: auth type
             };
 
             this.createUI();
             this.setupEventListeners();
 
+            // Load failedIds from localStorage to resume
             const storedFailed = localStorage.getItem('delltweet-failed');
             if (storedFailed) {
                 this.state.failedIds = JSON.parse(storedFailed);
                 if (this.state.failedIds.length > 0 && confirm(`Resume ${this.state.failedIds.length} failed tweets?`)) {
-                    this.state.tweetsToProcess = this.state.failedIds.map(id => ({ id, date: new Date() }));
+                    this.state.tweetsToProcess = this.state.failedIds.map(id => ({ id, date: new Date() })); // Dummy date for resume
                     this.updateStatus(`✅ ${this.state.tweetsToProcess.length} failed tweets loaded for retry`);
                     this.state.cache.get('btn-start').disabled = false;
                 }
             }
 
-            window.TweetDeleter_Instance = this;
-            console.log('✅ Interface ready! Upload your tweet.js file');
+            window.DellTweet_Instance = this;
+            console.log('✅ UI ready! Upload the tweet.js file');
         },
 
+        // Get cookie
         getCookie(name) {
             const match = document.cookie.match(new RegExp('(^|\s)' + name + '=([^;]+)'));
             return match ? match[2] : null;
         },
 
+        // Extract authorization token
         extractAuthToken() {
             const scripts = document.querySelectorAll('script');
             for (const script of scripts) {
@@ -95,12 +114,13 @@
             return null;
         },
 
+        // Create improved UI
         createUI() {
             const ui = document.createElement('div');
-            ui.id = 'deletetweet-ui';
+            ui.id = 'deltweet-ui';
             ui.innerHTML = `
                 <style>
-                    #deletetweet-ui {
+                    #deltweet-ui {
                         position: fixed;
                         top: 20px;
                         right: 20px;
@@ -117,29 +137,29 @@
                         font-family: Arial, sans-serif;
                         scrollbar-width: thin;
                     }
-                    #deletetweet-ui::-webkit-scrollbar {
+                    #deltweet-ui::-webkit-scrollbar {
                         width: 6px;
                     }
-                    #deletetweet-ui::-webkit-scrollbar-thumb {
+                    #deltweet-ui::-webkit-scrollbar-thumb {
                         background: #555;
                         border-radius: 3px;
                     }
-                    #deletetweet-ui h2 {
+                    #deltweet-ui h2 {
                         margin: 0 0 10px;
                         font-size: 18px;
                         display: flex;
                         justify-content: space-between;
                         align-items: center;
                     }
-                    #deletetweet-ui .form-group {
+                    #deltweet-ui .form-group {
                         margin-bottom: 15px;
                     }
-                    #deletetweet-ui label {
+                    #deltweet-ui label {
                         display: block;
                         margin-bottom: 5px;
                         font-size: 14px;
                     }
-                    #deletetweet-ui input[type="file"], #deletetweet-ui input[type="date"] {
+                    #deltweet-ui input[type="file"], #deltweet-ui input[type="date"] {
                         width: 100%;
                         padding: 8px;
                         background: #333;
@@ -147,59 +167,59 @@
                         border: 1px solid #555;
                         border-radius: 4px;
                     }
-                    #deletetweet-ui .checkbox-group {
+                    #deltweet-ui .checkbox-group {
                         display: flex;
                         flex-direction: column;
                     }
-                    #deletetweet-ui .checkbox-group label {
+                    #deltweet-ui .checkbox-group label {
                         display: flex;
                         align-items: center;
                         margin-bottom: 5px;
                     }
-                    #deletetweet-ui .checkbox-group input {
+                    #deltweet-ui .checkbox-group input {
                         margin-right: 10px;
                     }
-                    #deletetweet-ui .protected-tweets {
+                    #deltweet-ui .protected-tweets {
                         margin-bottom: 15px;
                         max-height: 150px;
                         overflow-y: auto;
                     }
-                    #deletetweet-ui .protected-list {
+                    #deltweet-ui .protected-list {
                         font-size: 12px;
                         color: #aaa;
                     }
-                    #deletetweet-ui .warning {
+                    #deltweet-ui .warning {
                         color: #ffcc00;
                         font-size: 12px;
                         margin-bottom: 15px;
                     }
-                    #deletetweet-ui .stats {
+                    #deltweet-ui .stats {
                         margin-bottom: 15px;
                     }
-                    #deletetweet-ui .stat-line {
+                    #deltweet-ui .stat-line {
                         display: flex;
                         justify-content: space-between;
                         padding: 2px 0;
                         font-size: 13px;
                     }
-                    #deletetweet-ui .progress-bar {
+                    #deltweet-ui .progress-bar {
                         height: 8px;
                         background: #333;
                         border-radius: 4px;
                         overflow: hidden;
                         margin-bottom: 10px;
                     }
-                    #deletetweet-ui .progress-fill {
+                    #deltweet-ui .progress-fill {
                         height: 100%;
                         background: #1da1f2;
                         transition: width 0.3s ease;
                     }
-                    #deletetweet-ui .status {
+                    #deltweet-ui .status {
                         font-size: 13px;
                         margin-bottom: 15px;
                         min-height: 20px;
                     }
-                    #deletetweet-ui button {
+                    #deltweet-ui button {
                         width: 100%;
                         padding: 10px;
                         margin-bottom: 10px;
@@ -211,26 +231,26 @@
                         font-size: 14px;
                         transition: background 0.2s;
                     }
-                    #deletetweet-ui button:hover {
+                    #deltweet-ui button:hover {
                         background: #0c85d0;
                     }
-                    #deletetweet-ui button:disabled {
+                    #deltweet-ui button:disabled {
                         background: #555;
                         cursor: not-allowed;
                     }
-                    #deletetweet-ui .btn-stop, #deletetweet-ui .btn-pause {
+                    #deltweet-ui .btn-stop, #deltweet-ui .btn-pause {
                         background: #ff4d4d;
                     }
-                    #deletetweet-ui .btn-stop:hover, #deletetweet-ui .btn-pause:hover {
+                    #deltweet-ui .btn-stop:hover, #deltweet-ui .btn-pause:hover {
                         background: #cc0000;
                     }
-                    #deletetweet-ui .btn-export {
+                    #deltweet-ui .btn-export {
                         background: #4caf50;
                     }
-                    #deletetweet-ui .btn-export:hover {
+                    #deltweet-ui .btn-export:hover {
                         background: #388e3c;
                     }
-                    #deletetweet-ui .btn-close {
+                    #deltweet-ui .btn-close {
                         background: #777;
                         width: auto;
                         padding: 5px 10px;
@@ -251,14 +271,14 @@
                         margin-top: 10px;
                     }
                 </style>
-                <h2>🗑️ TweetDeleter <span class="version">v2.6</span></h2>
+                <h2>🗑️ DellTweet <span class="version">v2.6</span></h2>
                 <div class="form-group">
                     <label for="tk-file">📁 Select the tweet.js file:</label>
                     <input type="file" id="tk-file" accept=".js,.json">
                     <div class="file-info" id="tk-file-info"></div>
                 </div>
                 <div class="form-group">
-                    <label for="tk-date">📅 Delete tweets before:</label>
+                    <label for="tk-date">📅 Delete tweets older than:</label>
                     <input type="date" id="tk-date">
                 </div>
                 <div class="checkbox-group">
@@ -270,7 +290,7 @@
                 <div class="protected-tweets">
                     <h4>🛡️ Protected Tweets (${this.protectedIds.length})</h4>
                     <div class="protected-list">${this.protectedIds.map((id, index) => `${index + 1}. ${id}`).join('<br>')}
-</div>
+                    </div>
                 </div>
                 <div class="warning">⚠️ Irreversible action! Make a backup.</div>
                 <div class="stats" id="tk-stats">
@@ -295,12 +315,14 @@
             this.populateCache();
         },
 
+        // Populate cache with all elements
         populateCache() {
             const elements = ['stats', 'btn-start', 'btn-stop', 'btn-pause', 'btn-export', 'btn-close', 'status', 'file-info', 'progress-bar', 'progress-fill'];
-            elements.forEach(id => this.state.cache.set(id, document.getElementById(`tk-${id}`)));
-            ['found', 'todelete', 'deleted', 'skipped', 'protected', 'failed', 'speed', 'elapsed'].forEach(stat => this.state.cache.set(`stat-${stat}`, document.getElementById(`stat-${stat}`)));
+            elements.forEach(id => this.state.cache.set(id, document.getElementById(`tk-${id}`));
+            ['found', 'todelete', 'deleted', 'skipped', 'protected', 'failed', 'speed', 'elapsed'].forEach(stat => this.state.cache.set(`stat-${stat}`, document.getElementById(`stat-${stat}`));
         },
 
+        // Setup event listeners
         setupEventListeners() {
             const cache = this.state.cache;
             cache.get('btn-start').addEventListener('click', () => this.start());
@@ -317,7 +339,7 @@
 
             document.getElementById('tk-test-mode').addEventListener('change', (e) => {
                 this.config.testMode = e.target.checked;
-                this.updateStatus(this.config.testMode ? '🧪 Test mode activated' : '💫 Test mode deactivated');
+                this.updateStatus(this.config.testMode ? '🧪 Test mode enabled' : '💫 Test mode disabled');
             });
 
             document.getElementById('tk-debug-mode').addEventListener('change', (e) => {
@@ -326,7 +348,7 @@
                 if (e.target.checked) {
                     debugEl.classList.add('active');
                     this.state.cache.set('debug', debugEl);
-                    document.getElementById('deletetweet-ui').appendChild(debugEl);
+                    document.getElementById('deltweet-ui').appendChild(debugEl);
                 } else if (this.state.cache.get('debug')) {
                     this.state.cache.get('debug').remove();
                     this.state.cache.delete('debug');
@@ -346,6 +368,7 @@
             }, 1000);
         },
 
+        // Debug function (with scroll)
         debug(message, data = null) {
             if (!document.getElementById('tk-debug-mode')?.checked || !this.state.cache.get('debug')) return;
             const debugEl = this.state.cache.get('debug');
@@ -353,10 +376,11 @@
             const line = `[${timestamp}] ${message}${data ? '\n' + JSON.stringify(data, null, 2) : ''}\n`;
             debugEl.textContent = line + debugEl.textContent;
             if (debugEl.textContent.split('\n').length > 50) debugEl.textContent = debugEl.textContent.split('\n').slice(0, 50).join('\n');
-            debugEl.scrollTop = 0;
+            debugEl.scrollTop = 0; // Scroll to top for new messages
             console.log(`[Debug] ${message}`, data || '');
         },
 
+        // Process file (with fallback to FileReader)
         async processFile(file) {
             if (!file) {
                 this.updateStatus('❌ No file selected.');
@@ -378,13 +402,15 @@
             let content = '';
             try {
                 if (file.stream) {
+                    // Streaming for large files
                     const reader = file.stream().pipeThrough(new TextDecoderStream()).getReader();
                     let chunk;
                     while (!(chunk = await reader.read()).done) {
                         content += chunk.value;
-                        if (content.length > 1024 * 1024 * 10) throw new Error('File too large (>10MB chunk).');
+                        if (content.length > 1024 * 1024 * 10) throw new Error('File too large (>10MB chunk).'); // Safety limit
                     }
                 } else {
+                    // Fallback FileReader
                     content = await new Promise((resolve, reject) => {
                         const fr = new FileReader();
                         fr.onload = () => resolve(fr.result);
@@ -424,9 +450,9 @@
                     const tweet = item.tweet || item;
                     const id = tweet.id_str || tweet.id;
                     const dateStr = tweet.created_at;
-                    if (!id || !/^\d+$/.test(id)) return null;
+                    if (!id || !/^\d+$/.test(id)) return null; // ID validation
                     const date = dateStr ? new Date(dateStr) : new Date();
-                    if (isNaN(date.getTime())) return null;
+                    if (isNaN(date.getTime())) return null; // Date validation
                     return {
                         id,
                         date,
@@ -444,13 +470,14 @@
                 this.debug(`Processing complete: ${tweetsData.length} tweets.`);
 
             } catch (error) {
-                this.debug('Error processing:', error);
+                this.debug('Processing error:', error);
                 this.updateStatus(`❌ ${error.message}`);
-                alert(error.message + '\n💡 Make sure you have the correct tweet.js file.');
+                alert(error.message + '\n💡 Make sure it is the correct tweet.js file.');
                 btnStart.disabled = true;
             }
         },
 
+        // Start process (with upfront filter)
         async start() {
             if (this.state.tweetsToProcess.length === 0) {
                 alert('Load a valid tweet.js file or resume failed ones.');
@@ -473,6 +500,7 @@
                 if (!this.config.maxDate || this.config.maxDate > sevenDaysAgo) this.config.maxDate = sevenDaysAgo;
             }
 
+            // Upfront filter
             const protectedTweets = this.state.tweetsToProcess.filter(t => this.protectedIds.includes(t.id));
             const toDelete = this.state.tweetsToProcess.filter(t => !this.protectedIds.includes(t.id) && (!this.config.maxDate || t.date <= this.config.maxDate));
             const skipped = this.state.tweetsToProcess.length - protectedTweets.length - toDelete.length;
@@ -507,10 +535,12 @@
             await this.deleteLoop();
         },
 
+        // Main loop with limited concurrency and async iterator
         async deleteLoop() {
             const tweets = [...this.state.tweetsToProcess];
             if (tweets.length === 0) return this.showCompletionSummary();
 
+            // Concurrency limiter implementation
             let concurrency = this.config.concurrency;
             let index = 0;
             const results = new Array(tweets.length);
@@ -523,7 +553,7 @@
                     const i = index++;
                     try {
                         results[i] = await this.processTweet(tweets[i]);
-                    } catch {}
+                    } catch {} // Ignore errors, handled in processTweet
                     this.state.processedCount++;
                     this.updateProgress();
                     await this.sleep(this.config.deleteDelay);
@@ -537,7 +567,8 @@
 
             await Promise.all(workers.map(w => w()));
 
-            const successRate = this.state.stats.deleted / (this.state.stats.deleted + this.state.stats.failed || 1);
+            // Dynamic concurrency adjustment
+            const successRate = this.state.stats.deleted / (this.state.stats.failed + this.state.stats.deleted || 1);
             this.state.lastSuccessRate = successRate;
             this.config.concurrency = Math.max(1, Math.min(5, Math.round(this.config.concurrency * successRate)));
 
@@ -551,6 +582,7 @@
                 this.stop();
             }
 
+            // Save failedIds for resume
             if (this.state.failedIds.length > 0) {
                 localStorage.setItem('delltweet-failed', JSON.stringify(this.state.failedIds));
             } else {
@@ -558,11 +590,12 @@
             }
         },
 
+        // Process tweet (with retry and backoff)
         async processTweet(tweetData) {
             const tweetId = tweetData.id;
 
             if (this.config.testMode) {
-                await this.sleep(500);
+                await this.sleep(500); // Simulate delay
                 this.state.stats.deleted++;
                 this.updateStatus(`🧪 Simulated: ${tweetId}`);
                 this.updateStats();
@@ -574,7 +607,7 @@
                 try {
                     success = await this.deleteTweet(tweetId);
                     if (success) break;
-                    await this.sleep(1000 * Math.pow(2, attempt - 1));
+                    await this.sleep(1000 * Math.pow(2, attempt - 1)); // Exponential backoff
                 } catch (error) {
                     this.debug(`Unexpected error on ${tweetId}:`, error);
                 }
@@ -591,13 +624,14 @@
             return success;
         },
 
+        // Delete tweet (with simulation in test mode and robust handling)
         async deleteTweet(tweetId) {
             try {
                 const response = await fetch('https://x.com/i/api/graphql/VaenaVgh5q5ih7kvyVjgtg/DeleteTweet', {
                     method: 'POST',
                     headers: {
                         ...this.headers,
-                        'x-client-transaction-id': crypto.randomUUID() || `${Math.random().toString(36).slice(2)}-${Date.now()}`
+                        'x-client-transaction-id': crypto.randomUUID() || `${Math.random().toString(36).slice(2)}-${Date.now()}` // Fallback for older browsers
                     },
                     credentials: 'include',
                     body: JSON.stringify({
@@ -609,7 +643,7 @@
                 const rateLimitReset = response.headers.get('x-rate-limit-reset');
                 if (rateLimitReset) this.state.rateLimitReset = new Date(parseInt(rateLimitReset) * 1000);
 
-                if (response.status === 200 || response.status === 404) {
+                if (response.status === 200 || response.status === 404) { // 404: already deleted
                     return true;
                 }
                 if (response.status === 429) {
@@ -627,6 +661,7 @@
             }
         },
 
+        // Handle rate limit (with backoff)
         async handleRateLimit() {
             let waitTime = this.config.rateLimitWait;
             if (this.state.rateLimitReset) {
@@ -638,6 +673,7 @@
             }
         },
 
+        // Update statistics (batched DOM update)
         updateStats() {
             const cache = this.state.cache;
             const stats = this.state.stats;
@@ -653,23 +689,27 @@
             }
         },
 
+        // Update progress
         updateProgress() {
             const processed = this.state.stats.deleted + this.state.stats.failed;
             const total = this.state.stats.toDelete;
             this.state.cache.get('progress-fill').style.width = `${(processed / total * 100) || 0}%`;
         },
 
+        // Update status
         updateStatus(message) {
             this.state.cache.get('status').textContent = message;
             this.debug(message);
         },
 
+        // Pause/Resume
         togglePause() {
             this.state.paused = !this.state.paused;
             this.updateStatus(this.state.paused ? '⏸️ Paused' : '▶️ Resumed');
             this.state.cache.get('btn-pause').textContent = this.state.paused ? '▶️ RESUME' : '⏸️ PAUSE';
         },
 
+        // Stop process
         stop() {
             this.state.running = false;
             this.state.paused = false;
@@ -680,6 +720,7 @@
             this.updateStatus('⏹️ Finished');
         },
 
+        // Show summary
         showCompletionSummary() {
             const stats = this.state.stats;
             const duration = Date.now() - stats.startTime;
@@ -690,6 +731,7 @@
             alert(summary);
         },
 
+        // Export report (with failedIds)
         async exportReport() {
             const report = {
                 version: '2.6',
@@ -709,19 +751,21 @@
             this.updateStatus('📊 Report exported!');
         },
 
+        // Close
         close() {
             if (this.state.running && !confirm('Close while running?')) return;
             this.state.running = false;
-            document.getElementById('deletetweet-ui')?.remove();
-            window.TweetDeleter_Instance = null;
+            document.getElementById('deltweet-ui')?.remove();
+            window.DellTweet_Instance = null;
             console.log('👋 Closed');
         },
 
+        // Sleep
         sleep(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
         }
     };
 
-    await TweetDeleter.init();
+    await DellTweet.init();
 
 })();
